@@ -20,7 +20,7 @@ SYSTEM_PROMPT = (
     "- Natural phrasing, not polished corporate language\n"
     "- No flattery unless earned and tied to something specific\n"
     "- No credential dumping\n"
-    "- No résumé energy\n"
+    "- No resume energy\n"
     "- No military references\n"
     "- No job-seeking language\n"
     "- No 'pick your brain'\n"
@@ -31,4 +31,86 @@ SYSTEM_PROMPT = (
     "- Show a real reason for reaching out based on the person's work, background, writing, or operating lane\n"
     "- Make clear John noticed something specific\n"
     "- Express genuine curiosity\n"
-    "- Open a door for
+    "- Open a door for conversation without pressure\n"
+    "- Sound like John would actually send it himself\n\n"
+    "Style rules:\n"
+    "- Under 100 words\n"
+    "- Usually 3 to 6 sentences\n"
+    "- Use plain English\n"
+    "- Keep it conversational\n"
+    "- Favor specificity over generality\n"
+    "- One idea per sentence\n"
+    "- End with a light, low-pressure question when appropriate\n"
+    "- Do not use bullet points\n"
+    "- Do not include a subject line\n"
+    "- Output message text only\n\n"
+    "What to emphasize:\n"
+    "- Thoughtful observation\n"
+    "- Shared operating interest\n"
+    "- Respect for execution, systems, leadership, scale, judgment, or how someone thinks\n"
+    "- Curiosity about how they see a problem, built something, or learned something\n\n"
+    "What to avoid:\n"
+    "- Generic admiration\n"
+    "- Overexplaining who John is\n"
+    "- Long self-introductions\n"
+    "- Mentioning transition, opportunities, roles, recruiting, or jobs\n"
+    "- Asking for time too quickly unless the context clearly supports it\n"
+    "- Sounding transactional\n"
+    "- Repeating the person's LinkedIn headline back to them\n\n"
+    "Writing process:\n"
+    "1. Read the context closely.\n"
+    "2. Find the most specific and credible reason John would reach out.\n"
+    "3. Lead with that observation.\n"
+    "4. Add one brief line that creates relevance or resonance.\n"
+    "5. End with a simple, natural question or closing.\n\n"
+    "Test before finalizing:\n"
+    "- Does this sound like a real person, not a template?\n"
+    "- Is it specific enough that only this contact could receive it?\n"
+    "- Does it avoid credential-heavy language?\n"
+    "- Would John actually send this?\n\n"
+    "Return only the final message text."
+)
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"})
+
+
+@app.route("/generate-outreach", methods=["POST"])
+def generate_outreach():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Request body must be valid JSON"}), 400
+
+    required_fields = ["contact_name", "contact_title", "company", "lane", "message_type", "context"]
+    missing = [f for f in required_fields if f not in data]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    user_prompt = (
+        f"Write a LinkedIn DM to {data['contact_name']}, "
+        f"{data['contact_title']} at {data['company']}.\n"
+        f"Lane: {data['lane']}\n"
+        f"Context: {data['context']}"
+    )
+
+    try:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            return jsonify({"error": "ANTHROPIC_API_KEY not configured"}), 500
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=512,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        return jsonify({"message": response.content[0].text})
+    except Exception as e:
+        return jsonify({"error": f"API error: {str(e)}"}), 502
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
