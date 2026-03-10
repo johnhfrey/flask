@@ -48,7 +48,6 @@ Before returning the message, confirm:
 - it contains no job-seeking or transition language
 
 Return only the final message text."""
-)
 
 
 @app.route("/health", methods=["GET"])
